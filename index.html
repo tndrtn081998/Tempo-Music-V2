@@ -779,14 +779,44 @@ window.onYouTubeIframeAPIReady = function () {
         }
       },
       onStateChange: (e) => {
-        if (e.data === YT.PlayerState.PLAYING) playerToggleBtn.textContent = '⏸';
-        else if (e.data === YT.PlayerState.PAUSED) playerToggleBtn.textContent = '▶';
+        if (e.data === YT.PlayerState.PLAYING) { playerToggleBtn.textContent = '⏸'; setMediaSessionPlaybackState('playing'); }
+        else if (e.data === YT.PlayerState.PAUSED) { playerToggleBtn.textContent = '▶'; setMediaSessionPlaybackState('paused'); }
         else if (e.data === YT.PlayerState.ENDED) { playerToggleBtn.textContent = '▶'; handleTrackEnded(); }
       },
       onError: () => handleTrackError()
     }
   });
+  setupMediaSessionHandlers();
 };
+
+/* ---------- Hardware media keys (headphone remote / lock-screen controls) ---------- */
+function setupMediaSessionHandlers() {
+  if (!('mediaSession' in navigator)) return;
+  const safeSet = (action, handler) => {
+    try { navigator.mediaSession.setActionHandler(action, handler); } catch (e) { /* action not supported on this browser */ }
+  };
+  safeSet('play', () => { if (ytPlayer && ytReady) ytPlayer.playVideo(); });
+  safeSet('pause', () => { if (ytPlayer && ytReady) ytPlayer.pauseVideo(); });
+  safeSet('previoustrack', () => goPrev());
+  safeSet('nexttrack', () => goNext());
+}
+
+function setMediaSessionPlaybackState(state) {
+  if ('mediaSession' in navigator) {
+    try { navigator.mediaSession.playbackState = state; } catch (e) {}
+  }
+}
+
+function updateMediaSessionMetadata(title, artist) {
+  if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: title || 'Music-BMP',
+      artist: artist || '',
+      album: 'Music-BMP Playlist'
+    });
+  } catch (e) {}
+}
 
 // Talks to the actual YT.Player instance (or queues until it's ready).
 function loadAndPlay(id, title, artist) {
@@ -794,6 +824,7 @@ function loadAndPlay(id, title, artist) {
   playerArtistEl.textContent = artist || '';
   playerBar.classList.add('visible');
   document.body.classList.add('has-player');
+  updateMediaSessionMetadata(title, artist);
 
   if (!ytReady || !ytPlayer) {
     pendingPlay = { id, title, artist };
