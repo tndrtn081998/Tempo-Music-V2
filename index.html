@@ -186,14 +186,14 @@
   }
 
   /* ---------- Now-playing mini player ---------- */
-  body.has-player { padding-bottom: 170px; }
+  body.has-player { padding-bottom: 220px; }
   #playerBar {
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: 50;
     display: flex;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    gap: 8px;
     padding: 10px 14px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
     background: rgba(17,17,32,0.92);
@@ -204,6 +204,8 @@
     transition: transform 0.25s ease;
   }
   #playerBar.visible { transform: translateY(0); }
+  .player-row-top { display: flex; align-items: center; gap: 12px; }
+  .player-row-controls { display: flex; align-items: center; gap: 8px; }
   .player-frame-wrap {
     width: 168px; height: 95px;
     border-radius: 10px;
@@ -216,20 +218,46 @@
   .player-now { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--cyan); letter-spacing: 0.08em; text-transform: uppercase; }
   .player-title { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .player-artist { font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .player-controls { display: flex; gap: 6px; flex-shrink: 0; }
   .player-btn {
     width: 34px; height: 34px; border-radius: 9px;
     background: var(--surface); border: 1px solid var(--border);
     color: var(--text); font-size: 0.95rem;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
+    cursor: pointer; flex-shrink: 0;
   }
   .player-btn:hover { border-color: rgba(255,255,255,0.25); }
+  #playerRepeat.active { background: rgba(0,212,255,0.18); border-color: var(--cyan); color: var(--cyan); }
+  #playerRepeat.active-one { background: rgba(255,45,120,0.18); border-color: var(--pink); color: var(--pink); }
+  .player-position {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ---------- Play-all-filtered button ---------- */
+  .play-all-btn {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,212,255,0.25);
+    background: linear-gradient(90deg, rgba(0,212,255,0.14), rgba(124,58,237,0.14));
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .play-all-btn:hover { border-color: rgba(0,212,255,0.5); }
+  .play-all-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .play-all-btn .count { color: var(--cyan); font-family: 'DM Mono', monospace; font-weight: 500; }
 
   @media (max-width: 480px) {
-    .player-frame-wrap { width: 140px; height: 79px; }
+    .player-frame-wrap { width: 130px; height: 73px; }
     .player-title { font-size: 0.78rem; }
     .player-artist { font-size: 0.68rem; }
+    body.has-player { padding-bottom: 205px; }
   }
 </style>
 </head>
@@ -281,19 +309,26 @@
     <button class="action-btn" id="sortBtn">⇅ BPM ↑</button>
   </div>
   <div id="randomResult"></div>
+  <button class="play-all-btn" id="playAllBtn" disabled>▶ เล่นเพลย์ลิสต์จากตัวกรองนี้ <span class="count" id="playAllCount">(0 เพลง)</span></button>
   <div id="results"></div>
 </div>
 
 <div id="playerBar">
-  <div class="player-frame-wrap"><div id="ytPlayerMount"></div></div>
-  <div class="player-info">
-    <div class="player-now">กำลังเล่น</div>
-    <div class="player-title" id="playerTitle">—</div>
-    <div class="player-artist" id="playerArtist"></div>
-  </div>
-  <div class="player-controls">
-    <button class="player-btn" id="playerToggle" title="เล่น/พัก" aria-label="เล่นหรือพัก">⏸</button>
+  <div class="player-row-top">
+    <div class="player-frame-wrap"><div id="ytPlayerMount"></div></div>
+    <div class="player-info">
+      <div class="player-now">กำลังเล่น</div>
+      <div class="player-title" id="playerTitle">—</div>
+      <div class="player-artist" id="playerArtist"></div>
+    </div>
     <button class="player-btn" id="playerClose" title="ปิดเพลย์เยอร์" aria-label="ปิดเพลย์เยอร์">✕</button>
+  </div>
+  <div class="player-row-controls">
+    <button class="player-btn" id="playerPrev" title="เพลงก่อนหน้า" aria-label="เพลงก่อนหน้า">⏮</button>
+    <button class="player-btn" id="playerToggle" title="เล่น/พัก" aria-label="เล่นหรือพัก">⏸</button>
+    <button class="player-btn" id="playerNext" title="เพลงต่อไป" aria-label="เพลงต่อไป">⏭</button>
+    <button class="player-btn" id="playerRepeat" title="ปิดการวนซ้ำ (กดเพื่อเปลี่ยน)" aria-label="สลับโหมดวนซ้ำ">🔁</button>
+    <span class="player-position" id="playerPosition"></span>
   </div>
 </div>
 
@@ -614,11 +649,12 @@ function extractVideoId(url) {
   return null;
 }
 
-function rowHTML(s) {
+function rowHTML(s, idx) {
   const {color,bg} = getBpmStyle(s.bpm);
   const url = s.url ? s.url : 'https://music.youtube.com/search?q=' + encodeURIComponent(s.title+' '+s.artist);
+  const idxAttr = (idx !== undefined && idx !== null) ? ` data-idx="${idx}"` : '';
 
-  return `<div class="song-row" data-url="${escapeAttr(url)}" data-title="${escapeAttr(s.title)}" data-artist="${escapeAttr(s.artist)}" style="cursor:pointer;">
+  return `<div class="song-row" data-url="${escapeAttr(url)}" data-title="${escapeAttr(s.title)}" data-artist="${escapeAttr(s.artist)}"${idxAttr} style="cursor:pointer;">
     <div class="bpm-badge" style="background:${bg}">
       <span class="bpm-num" style="color:${color}">${s.bpm}</span>
       <span class="bpm-label" style="color:${color}">BPM</span>
@@ -632,13 +668,19 @@ function rowHTML(s) {
   </div>`;
 }
 
+let lastFiltered = [];
 
 function render() {
   const f = getFiltered();
+  lastFiltered = f;
   document.querySelector('.song-count').innerHTML =
     'พบ <span>' + f.length + '</span> เพลง · ทั้งหมด ' + MUSIC_DB.length + ' เพลง';
   const c = document.getElementById('results');
-  c.innerHTML = f.length ? f.map(rowHTML).join('') : '<div class="empty-state">ไม่พบเพลงที่ตรงเงื่อนไข</div>';
+  c.innerHTML = f.length ? f.map((s,i)=>rowHTML(s,i)).join('') : '<div class="empty-state">ไม่พบเพลงที่ตรงเงื่อนไข</div>';
+
+  const playAllBtn = document.getElementById('playAllBtn');
+  document.getElementById('playAllCount').textContent = '(' + f.length + ' เพลง)';
+  playAllBtn.disabled = f.length === 0;
 }
 
 document.querySelectorAll('.zone-chip').forEach(btn => {
@@ -671,9 +713,10 @@ document.getElementById('sortBtn').addEventListener('click', () => {
 document.getElementById('randomBtn').addEventListener('click', () => {
   const f = getFiltered();
   if (!f.length) return;
-  const s = f[Math.floor(Math.random()*f.length)];
+  const idx = Math.floor(Math.random()*f.length);
+  const s = f[idx];
   document.getElementById('randomResult').innerHTML =
-    '<div class="random-box"><div class="random-label">⚡ สุ่มได้เพลงนี้</div>' + rowHTML(s) + '</div>';
+    '<div class="random-box"><div class="random-label">⚡ สุ่มได้เพลงนี้</div>' + rowHTML(s, idx) + '</div>';
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -697,16 +740,24 @@ document.getElementById('sBpm').addEventListener('input', () => {
 
 document.getElementById('sLang').addEventListener('change', render);
 
-/* ---------- In-page mini player (no leaving to the YouTube Music page) ---------- */
+/* ---------- In-page mini player with playlist (next / repeat / auto-advance) ---------- */
 let ytPlayer = null;
 let ytReady = false;
-let pendingPlay = null; // {id, title, artist, fallbackUrl} queued if a row is clicked before the player has initialized
+let pendingPlay = null; // {id, title, artist} queued if a row is clicked before the player has initialized
 let currentFallbackUrl = null;
+
+let playlist = [];        // the queue currently being played (built from the filtered list)
+let playlistIndex = -1;   // index of the current track within playlist
+let repeatMode = 'off';   // 'off' | 'all' | 'one'
 
 const playerBar = document.getElementById('playerBar');
 const playerTitleEl = document.getElementById('playerTitle');
 const playerArtistEl = document.getElementById('playerArtist');
 const playerToggleBtn = document.getElementById('playerToggle');
+const playerPrevBtn = document.getElementById('playerPrev');
+const playerNextBtn = document.getElementById('playerNext');
+const playerRepeatBtn = document.getElementById('playerRepeat');
+const playerPositionEl = document.getElementById('playerPosition');
 
 window.onYouTubeIframeAPIReady = function () {
   const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : undefined;
@@ -724,60 +775,148 @@ window.onYouTubeIframeAPIReady = function () {
         if (pendingPlay) {
           const p = pendingPlay;
           pendingPlay = null;
-          playVideo(p.id, p.title, p.artist, p.fallbackUrl);
+          loadAndPlay(p.id, p.title, p.artist);
         }
       },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) playerToggleBtn.textContent = '⏸';
-        else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) playerToggleBtn.textContent = '▶';
+        else if (e.data === YT.PlayerState.PAUSED) playerToggleBtn.textContent = '▶';
+        else if (e.data === YT.PlayerState.ENDED) { playerToggleBtn.textContent = '▶'; handleTrackEnded(); }
       },
-      onError: () => {
-        // Embedding failed (missing referrer / error 153, embedding disallowed, video removed, etc.)
-        // Fall back to opening the song directly instead of leaving a broken player on screen.
-        playerBar.classList.remove('visible');
-        document.body.classList.remove('has-player');
-        if (currentFallbackUrl) {
-          window.open(currentFallbackUrl, '_blank', 'noopener');
-          currentFallbackUrl = null;
-        }
-      }
+      onError: () => handleTrackError()
     }
   });
 };
 
-function playVideo(id, title, artist, fallbackUrl) {
-  currentFallbackUrl = fallbackUrl || null;
+// Talks to the actual YT.Player instance (or queues until it's ready).
+function loadAndPlay(id, title, artist) {
   playerTitleEl.textContent = title || '—';
   playerArtistEl.textContent = artist || '';
   playerBar.classList.add('visible');
   document.body.classList.add('has-player');
 
   if (!ytReady || !ytPlayer) {
-    pendingPlay = { id, title, artist, fallbackUrl };
+    pendingPlay = { id, title, artist };
     return;
   }
   ytPlayer.loadVideoById(id);
   ytPlayer.playVideo();
 }
 
+// Plays playlist[index], wrapping around. If a track has no embeddable video id
+// (e.g. only a generic search link), it's skipped automatically — `attempted`
+// caps how many skips we try so we don't loop forever if everything fails.
+function playFromPlaylist(index, attempted) {
+  attempted = attempted || 0;
+  if (!playlist.length || attempted >= playlist.length) {
+    playerBar.classList.remove('visible');
+    document.body.classList.remove('has-player');
+    return;
+  }
+  const n = playlist.length;
+  index = ((index % n) + n) % n;
+  playlistIndex = index;
+  const s = playlist[playlistIndex];
+  const videoId = extractVideoId(s.url);
+  if (!videoId) {
+    playFromPlaylist(index + 1, attempted + 1);
+    return;
+  }
+  currentFallbackUrl = s.url;
+  updatePlaylistPositionUI();
+  loadAndPlay(videoId, s.title, s.artist);
+}
+
+function goNext() {
+  if (!playlist.length) return;
+  playFromPlaylist(playlistIndex + 1, 0);
+}
+function goPrev() {
+  if (!playlist.length) return;
+  playFromPlaylist(playlistIndex - 1, 0);
+}
+
+function handleTrackEnded() {
+  if (!playlist.length) return;
+  if (repeatMode === 'one') {
+    playFromPlaylist(playlistIndex, 0);
+    return;
+  }
+  if (playlistIndex < playlist.length - 1) {
+    playFromPlaylist(playlistIndex + 1, 0);
+  } else if (repeatMode === 'all') {
+    playFromPlaylist(0, 0);
+  }
+  // repeatMode 'off' and at the end of the list: just stop, stay paused on the last track.
+}
+
+function handleTrackError() {
+  if (playlist.length) {
+    // Don't interrupt continuous listening with a popup tab — just skip ahead.
+    playFromPlaylist(playlistIndex + 1, 1);
+  } else if (currentFallbackUrl) {
+    playerBar.classList.remove('visible');
+    document.body.classList.remove('has-player');
+    window.open(currentFallbackUrl, '_blank', 'noopener');
+    currentFallbackUrl = null;
+  }
+}
+
+function updatePlaylistPositionUI() {
+  playerPositionEl.textContent = playlist.length ? (playlistIndex + 1) + ' / ' + playlist.length : '';
+}
+
+function updateRepeatUI() {
+  playerRepeatBtn.classList.remove('active', 'active-one');
+  if (repeatMode === 'all') {
+    playerRepeatBtn.classList.add('active');
+    playerRepeatBtn.textContent = '🔁';
+    playerRepeatBtn.title = 'วนทั้งเพลย์ลิสต์ (กดเพื่อเปลี่ยน)';
+  } else if (repeatMode === 'one') {
+    playerRepeatBtn.classList.add('active-one');
+    playerRepeatBtn.textContent = '🔂';
+    playerRepeatBtn.title = 'วนเพลงเดียว (กดเพื่อเปลี่ยน)';
+  } else {
+    playerRepeatBtn.textContent = '🔁';
+    playerRepeatBtn.title = 'ปิดการวนซ้ำ (กดเพื่อเปลี่ยน)';
+  }
+}
+
+// Clicking any song row plays it AND sets the queue to the currently filtered/sorted
+// list, starting from that song — so next/prev/repeat naturally browse through
+// whatever's currently visible on screen.
 function handleSongRowClick(e) {
   const row = e.target.closest('.song-row');
   if (!row) return;
+  const idxAttr = row.dataset.idx;
+
+  if (idxAttr !== undefined && lastFiltered[idxAttr]) {
+    playlist = lastFiltered.slice();
+    playFromPlaylist(parseInt(idxAttr, 10), 0);
+    return;
+  }
+
+  // Fallback for rows without a tracked index.
   const url = row.dataset.url;
   const title = row.dataset.title;
   const artist = row.dataset.artist;
   const videoId = extractVideoId(url);
-
   if (videoId) {
-    playVideo(videoId, title, artist, url);
+    playlist = [{ title, artist, url }];
+    playFromPlaylist(0, 0);
   } else {
-    // No specific video to embed (e.g. a generic search link) — fall back to opening it directly.
     window.open(url, '_blank', 'noopener');
   }
 }
 
 document.getElementById('results').addEventListener('click', handleSongRowClick);
 document.getElementById('randomResult').addEventListener('click', handleSongRowClick);
+
+document.getElementById('playAllBtn').addEventListener('click', () => {
+  if (!lastFiltered.length) return;
+  playlist = lastFiltered.slice();
+  playFromPlaylist(0, 0);
+});
 
 playerToggleBtn.addEventListener('click', () => {
   if (!ytPlayer || !ytReady) return;
@@ -786,12 +925,24 @@ playerToggleBtn.addEventListener('click', () => {
   else ytPlayer.playVideo();
 });
 
+playerPrevBtn.addEventListener('click', goPrev);
+playerNextBtn.addEventListener('click', goNext);
+
+playerRepeatBtn.addEventListener('click', () => {
+  repeatMode = repeatMode === 'off' ? 'all' : (repeatMode === 'all' ? 'one' : 'off');
+  updateRepeatUI();
+});
+
 document.getElementById('playerClose').addEventListener('click', () => {
   if (ytPlayer && ytReady) ytPlayer.stopVideo();
   playerBar.classList.remove('visible');
   document.body.classList.remove('has-player');
+  playlist = [];
+  playlistIndex = -1;
+  updatePlaylistPositionUI();
 });
 
+updateRepeatUI();
 render();
 </script>
 </body>
