@@ -101,7 +101,7 @@
     color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px;
   }
 
-  .zone-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+  .zone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
   .zone-chip {
     padding: 10px 4px; border-radius: 12px;
     border: 1px solid rgba(255,255,255,0.08); background: var(--card);
@@ -116,7 +116,17 @@
   .zone-chip.active .zone-name, .zone-chip.active .zone-range { color: var(--zone-color); }
 
   /* Actions */
-  .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 28px; }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .action-btn { white-space: nowrap; }
+
+  .sort-row { display: flex; gap: 8px; margin-bottom: 28px; }
+  .sort-select {
+    flex: 1; padding: 10px 12px; border-radius: 12px;
+    background: var(--card); border: 1px solid rgba(0,212,255,0.15);
+    color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.82rem;
+    outline: none; cursor: pointer;
+  }
+  .sort-dir-btn { flex-shrink: 0; min-width: 64px; }
   .action-btn {
     padding: 10px; border-radius: 12px; font-family: 'Outfit', sans-serif;
     font-size: 0.8rem; font-weight: 700; cursor: pointer;
@@ -183,6 +193,8 @@
   @media (max-width: 480px) {
     body { padding: 28px 14px 60px; }
     .zone-grid { gap: 5px; }
+    .action-grid { gap: 5px; }
+    .action-btn { font-size: 0.68rem; padding: 9px 3px; gap: 3px; }
   }
 
   /* ---------- Now-playing mini player ---------- */
@@ -216,6 +228,13 @@
   .player-frame-wrap iframe { width: 100%; height: 100%; display: block; border: 0; }
   .player-info { flex: 1; min-width: 0; }
   .player-now { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--cyan); letter-spacing: 0.08em; text-transform: uppercase; }
+  .player-bpm {
+    display: inline-block;
+    font-family: 'DM Mono', monospace; font-size: 0.6rem; font-weight: 700;
+    color: var(--pink); background: rgba(255,45,120,0.14);
+    border-radius: 6px; padding: 1px 6px; margin-left: 4px;
+    letter-spacing: 0.04em; vertical-align: middle;
+  }
   .player-title { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .player-artist { font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .player-btn {
@@ -228,6 +247,8 @@
   .player-btn:hover { border-color: rgba(255,255,255,0.25); }
   #playerRepeat.active { background: rgba(0,212,255,0.18); border-color: var(--cyan); color: var(--cyan); }
   #playerRepeat.active-one { background: rgba(255,45,120,0.18); border-color: var(--pink); color: var(--pink); }
+  .player-btn-small { width: 28px; height: 28px; font-size: 0.8rem; }
+  #playerShuffle.active { background: rgba(245,158,11,0.18); border-color: #f59e0b; color: #f59e0b; }
   .player-position {
     margin-left: auto;
     font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted);
@@ -301,13 +322,26 @@
     <button class="zone-chip" data-min="160" data-max="190" style="--zone-color:#ff2d78;--zone-glow:rgba(255,45,120,0.4);">
       <div class="zone-emoji">⚡</div><div class="zone-name">HIIT</div><div class="zone-range">160–190</div>
     </button>
+    <button class="zone-chip" data-min="191" style="--zone-color:#ef4444;--zone-glow:rgba(239,68,68,0.45);">
+      <div class="zone-emoji">🔥</div><div class="zone-name">โหด</div><div class="zone-range">&gt;190</div>
+    </button>
   </div>
 
   <div class="action-grid">
     <button class="action-btn" id="clearBtn">✕ ล้างทั้งหมด</button>
     <button class="action-btn" id="randomBtn">🔀 สุ่มเพลง</button>
-    <button class="action-btn" id="sortBtn">⇅ BPM ↑</button>
   </div>
+
+  <div class="sort-row">
+    <select class="sort-select" id="sortField">
+      <option value="bpm">เรียงตาม BPM</option>
+      <option value="title">เรียงตามชื่อเพลง (ก–ฮ)</option>
+      <option value="artist">เรียงตามศิลปิน (ก–ฮ)</option>
+      <option value="lang">เรียงตามภาษา (ก–ฮ)</option>
+    </select>
+    <button class="action-btn sort-dir-btn" id="sortBtn">⇅ ↑</button>
+  </div>
+
   <div id="randomResult"></div>
   <button class="play-all-btn" id="playAllBtn" disabled>▶ เล่นเพลย์ลิสต์จากตัวกรองนี้ <span class="count" id="playAllCount">(0 เพลง)</span></button>
   <div id="results"></div>
@@ -318,7 +352,7 @@
   <div class="player-row-top">
     <div class="player-frame-wrap"><div id="ytPlayerMount"></div></div>
     <div class="player-info">
-      <div class="player-now">กำลังเล่น</div>
+      <div class="player-now">กำลังเล่น <span class="player-bpm" id="playerBpm"></span></div>
       <div class="player-title" id="playerTitle">—</div>
       <div class="player-artist" id="playerArtist"></div>
     </div>
@@ -329,6 +363,7 @@
     <button class="player-btn" id="playerToggle" title="เล่น/พัก" aria-label="เล่นหรือพัก">⏸</button>
     <button class="player-btn" id="playerNext" title="เพลงต่อไป" aria-label="เพลงต่อไป">⏭</button>
     <button class="player-btn" id="playerRepeat" title="ปิดการวนซ้ำ (กดเพื่อเปลี่ยน)" aria-label="สลับโหมดวนซ้ำ">🔁</button>
+    <button class="player-btn player-btn-small" id="playerShuffle" title="เปิดสุ่มเพลงถัดไป" aria-label="สลับโหมดสุ่มเพลง">🔀</button>
     <span class="player-position" id="playerPosition"></span>
   </div>
 </div>
@@ -652,7 +687,21 @@ function getBpmStyle(bpm) {
 }
 
 let db = [...MUSIC_DB];
-let activeMin = null, activeMax = null, sortAsc = true;
+let activeMin = null, activeMax = null, sortAsc = true, sortField = 'bpm';
+
+function applySort() {
+  db.sort((a, b) => {
+    let result;
+    if (sortField === 'bpm') {
+      result = a.bpm - b.bpm;
+    } else {
+      // 'th' locale compare handles Thai script ordering correctly, and also
+      // works fine for the English/Japanese/Korean/Chinese titles in the list.
+      result = String(a[sortField]).localeCompare(String(b[sortField]), 'th');
+    }
+    return sortAsc ? result : -result;
+  });
+}
 
 function getFiltered() {
   const langVal = document.getElementById('sLang').value;
@@ -661,7 +710,7 @@ function getFiltered() {
     const matchLang = langVal === 'all' || s.lang === langVal;
     let matchBpm = true;
     if (activeMin !== null) {
-      matchBpm = s.bpm >= activeMin && s.bpm <= activeMax;
+      matchBpm = s.bpm >= activeMin && (activeMax === null || s.bpm <= activeMax);
     } else if (bpmVal) {
       const v = parseInt(bpmVal);
       matchBpm = s.bpm >= v-10 && s.bpm <= v+10;
@@ -698,7 +747,7 @@ function rowHTML(s, idx) {
   const url = s.url ? s.url : 'https://music.youtube.com/search?q=' + encodeURIComponent(s.title+' '+s.artist);
   const idxAttr = (idx !== undefined && idx !== null) ? ` data-idx="${idx}"` : '';
 
-  return `<div class="song-row" data-url="${escapeAttr(url)}" data-title="${escapeAttr(s.title)}" data-artist="${escapeAttr(s.artist)}"${idxAttr} style="cursor:pointer;">
+  return `<div class="song-row" data-url="${escapeAttr(url)}" data-title="${escapeAttr(s.title)}" data-artist="${escapeAttr(s.artist)}" data-bpm="${s.bpm}"${idxAttr} style="cursor:pointer;">
     <div class="bpm-badge" style="background:${bg}">
       <span class="bpm-num" style="color:${color}">${s.bpm}</span>
       <span class="bpm-label" style="color:${color}">BPM</span>
@@ -729,7 +778,8 @@ function render() {
 
 document.querySelectorAll('.zone-chip').forEach(btn => {
   btn.addEventListener('click', () => {
-    const min = parseInt(btn.dataset.min), max = parseInt(btn.dataset.max);
+    const min = parseInt(btn.dataset.min);
+    const max = btn.dataset.max !== undefined ? parseInt(btn.dataset.max) : null;
     const wasActive = activeMin===min && activeMax===max;
     document.querySelectorAll('.zone-chip').forEach(b => {
       b.classList.remove('active'); b.style.background=''; b.style.borderColor='';
@@ -742,32 +792,50 @@ document.querySelectorAll('.zone-chip').forEach(btn => {
       const c = getComputedStyle(btn).getPropertyValue('--zone-color').trim();
       btn.style.borderColor=c; btn.style.background=c+'22';
     }
-    document.getElementById('randomResult').innerHTML='';
+    document.getElementById('randomResult').innerHTML=''; lastRandomIdx=null;
     render();
   });
 });
 
 document.getElementById('sortBtn').addEventListener('click', () => {
   sortAsc = !sortAsc;
-  db.sort((a,b) => sortAsc ? a.bpm-b.bpm : b.bpm-a.bpm);
-  document.getElementById('sortBtn').textContent = '⇅ BPM ' + (sortAsc?'↑':'↓');
+  applySort();
+  document.getElementById('sortBtn').textContent = '⇅ ' + (sortAsc?'↑':'↓');
   render();
 });
 
-document.getElementById('randomBtn').addEventListener('click', () => {
+document.getElementById('sortField').addEventListener('change', (e) => {
+  sortField = e.target.value;
+  applySort();
+  render();
+});
+
+let lastRandomIdx = null;
+
+function showRandomPick(avoidRepeat) {
   const f = getFiltered();
   if (!f.length) return;
-  const idx = Math.floor(Math.random()*f.length);
+  let idx = Math.floor(Math.random()*f.length);
+  if (avoidRepeat && f.length > 1 && lastRandomIdx !== null) {
+    let attempts = 0;
+    while (idx === lastRandomIdx && attempts < 10) {
+      idx = Math.floor(Math.random()*f.length);
+      attempts++;
+    }
+  }
+  lastRandomIdx = idx;
   const s = f[idx];
   document.getElementById('randomResult').innerHTML =
     '<div class="random-box"><div class="random-label">⚡ สุ่มได้เพลงนี้</div>' + rowHTML(s, idx) + '</div>';
-});
+}
+
+document.getElementById('randomBtn').addEventListener('click', () => showRandomPick(false));
 
 document.getElementById('clearBtn').addEventListener('click', () => {
   activeMin=null; activeMax=null;
   document.getElementById('sBpm').value='';
   document.getElementById('sLang').value='all';
-  document.getElementById('randomResult').innerHTML='';
+  document.getElementById('randomResult').innerHTML=''; lastRandomIdx=null;
   document.querySelectorAll('.zone-chip').forEach(b => {
     b.classList.remove('active'); b.style.background=''; b.style.borderColor='';
   });
@@ -787,20 +855,23 @@ document.getElementById('sLang').addEventListener('change', render);
 /* ---------- In-page mini player with playlist (next / repeat / auto-advance) ---------- */
 let ytPlayer = null;
 let ytReady = false;
-let pendingPlay = null; // {id, title, artist} queued if a row is clicked before the player has initialized
+let pendingPlay = null; // {id, title, artist, bpm} queued if a row is clicked before the player has initialized
 let currentFallbackUrl = null;
 
 let playlist = [];        // the queue currently being played (built from the filtered list)
 let playlistIndex = -1;   // index of the current track within playlist
 let repeatMode = 'off';   // 'off' | 'all' | 'one'
+let shuffleEnabled = false;
 
 const playerBar = document.getElementById('playerBar');
 const playerTitleEl = document.getElementById('playerTitle');
 const playerArtistEl = document.getElementById('playerArtist');
+const playerBpmEl = document.getElementById('playerBpm');
 const playerToggleBtn = document.getElementById('playerToggle');
 const playerPrevBtn = document.getElementById('playerPrev');
 const playerNextBtn = document.getElementById('playerNext');
 const playerRepeatBtn = document.getElementById('playerRepeat');
+const playerShuffleBtn = document.getElementById('playerShuffle');
 const silentAnchor = document.getElementById('silentAnchor');
 
 // Keeps a real, local, silent <audio> element "playing" in sync with the YouTube
@@ -833,7 +904,7 @@ window.onYouTubeIframeAPIReady = function () {
         if (pendingPlay) {
           const p = pendingPlay;
           pendingPlay = null;
-          loadAndPlay(p.id, p.title, p.artist);
+          loadAndPlay(p.id, p.title, p.artist, p.bpm);
         }
       },
       onStateChange: (e) => {
@@ -877,16 +948,17 @@ function updateMediaSessionMetadata(title, artist) {
 }
 
 // Talks to the actual YT.Player instance (or queues until it's ready).
-function loadAndPlay(id, title, artist) {
+function loadAndPlay(id, title, artist, bpm) {
   playerTitleEl.textContent = title || '—';
   playerArtistEl.textContent = artist || '';
+  if (playerBpmEl) playerBpmEl.textContent = (bpm !== undefined && bpm !== null && bpm !== '') ? bpm + ' BPM' : '';
   playerBar.classList.add('visible');
   document.body.classList.add('has-player');
   updateMediaSessionMetadata(title, artist);
   syncSilentAnchor(true);
 
   if (!ytReady || !ytPlayer) {
-    pendingPlay = { id, title, artist };
+    pendingPlay = { id, title, artist, bpm };
     return;
   }
   ytPlayer.loadVideoById(id);
@@ -914,12 +986,27 @@ function playFromPlaylist(index, attempted) {
   }
   currentFallbackUrl = s.url;
   updatePlaylistPositionUI();
-  loadAndPlay(videoId, s.title, s.artist);
+  loadAndPlay(videoId, s.title, s.artist, s.bpm);
+}
+
+// When shuffle is on, picks a random track different from the current one
+// (falls back to the only available track if the playlist has just one song).
+function pickShuffledIndex() {
+  const n = playlist.length;
+  if (n <= 1) return 0;
+  let idx = Math.floor(Math.random() * n);
+  let attempts = 0;
+  while (idx === playlistIndex && attempts < 10) {
+    idx = Math.floor(Math.random() * n);
+    attempts++;
+  }
+  return idx;
 }
 
 function goNext() {
   if (!playlist.length) return;
-  playFromPlaylist(playlistIndex + 1, 0);
+  const idx = shuffleEnabled ? pickShuffledIndex() : playlistIndex + 1;
+  playFromPlaylist(idx, 0);
 }
 function goPrev() {
   if (!playlist.length) return;
@@ -930,6 +1017,13 @@ function handleTrackEnded() {
   if (!playlist.length) return;
   if (repeatMode === 'one') {
     playFromPlaylist(playlistIndex, 0);
+    return;
+  }
+  if (shuffleEnabled) {
+    if (playlist.length > 1 || repeatMode === 'all') {
+      playFromPlaylist(pickShuffledIndex(), 0);
+    }
+    // single-song playlist with repeat off: just stop, same as non-shuffle behavior.
     return;
   }
   if (playlistIndex < playlist.length - 1) {
@@ -972,6 +1066,11 @@ function updateRepeatUI() {
   }
 }
 
+function updateShuffleUI() {
+  playerShuffleBtn.classList.toggle('active', shuffleEnabled);
+  playerShuffleBtn.title = shuffleEnabled ? 'ปิดสุ่มเพลงถัดไป' : 'เปิดสุ่มเพลงถัดไป';
+}
+
 // Clicking any song row plays it AND sets the queue to the currently filtered/sorted
 // list, starting from that song — so next/prev/repeat naturally browse through
 // whatever's currently visible on screen.
@@ -990,9 +1089,10 @@ function handleSongRowClick(e) {
   const url = row.dataset.url;
   const title = row.dataset.title;
   const artist = row.dataset.artist;
+  const bpm = row.dataset.bpm ? parseInt(row.dataset.bpm, 10) : undefined;
   const videoId = extractVideoId(url);
   if (videoId) {
-    playlist = [{ title, artist, url }];
+    playlist = [{ title, artist, url, bpm }];
     playFromPlaylist(0, 0);
   } else {
     window.open(url, '_blank', 'noopener');
@@ -1023,6 +1123,11 @@ playerRepeatBtn.addEventListener('click', () => {
   updateRepeatUI();
 });
 
+playerShuffleBtn.addEventListener('click', () => {
+  shuffleEnabled = !shuffleEnabled;
+  updateShuffleUI();
+});
+
 document.getElementById('playerClose').addEventListener('click', () => {
   if (ytPlayer && ytReady) ytPlayer.stopVideo();
   syncSilentAnchor(false);
@@ -1031,9 +1136,11 @@ document.getElementById('playerClose').addEventListener('click', () => {
   playlist = [];
   playlistIndex = -1;
   updatePlaylistPositionUI();
+  if (playerBpmEl) playerBpmEl.textContent = '';
 });
 
 updateRepeatUI();
+updateShuffleUI();
 render();
 </script>
 </body>
